@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLibrary } from '../context/LibraryContext';
-import { Plus, Search, Edit2, Trash2, X, Check, AlertCircle, Loader2, Wand2 } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Check, AlertCircle, Loader2, Wand2, Sparkles } from 'lucide-react';
 import './Books.css';
 import './BooksError.css';
 
@@ -54,6 +54,64 @@ export default function Books() {
             }
         } catch (err) {
             setError('Failed to connect to book service. Please try manual entry.');
+        } finally {
+            setIsFetching(false);
+        }
+    };
+
+    const handleRandomBook = async () => {
+        const keywords = ['thriller', 'romance', 'sci-fi', 'drama', 'fantasy', 'mystery', 'novel', 'horror', 'contemporary', 'literary'];
+
+        setIsFetching(true);
+        setError(null);
+
+        let attempts = 0;
+        const maxAttempts = 5;
+        let found = false;
+
+        try {
+            while (attempts < maxAttempts && !found) {
+                const randomKeyword = keywords[Math.floor(Math.random() * keywords.length)];
+                const randomStart = Math.floor(Math.random() * 200);
+
+                // Add subject:fiction to ensure fiction results
+                const query = encodeURIComponent(`${randomKeyword}+subject:fiction`);
+                const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${query}&startIndex=${randomStart}&maxResults=10&printType=books`);
+                const data = await response.json();
+
+                if (data.items && data.items.length > 0) {
+                    // Look through the batch for a compliant book
+                    for (const item of data.items) {
+                        const bookInfo = item.volumeInfo;
+
+                        // Check for exactly one author
+                        const hasOneAuthor = bookInfo.authors && bookInfo.authors.length === 1;
+
+                        // Check for valid ISBN
+                        const isbn13 = bookInfo.industryIdentifiers?.find(id => id.type === 'ISBN_13')?.identifier;
+                        const isbn10 = bookInfo.industryIdentifiers?.find(id => id.type === 'ISBN_10')?.identifier;
+                        const foundISBN = isbn13 || isbn10;
+
+                        if (hasOneAuthor && foundISBN) {
+                            setFormData({
+                                title: bookInfo.title || '',
+                                author: bookInfo.authors[0],
+                                isbn: foundISBN,
+                                quantity: 1
+                            });
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+                attempts++;
+            }
+
+            if (!found) {
+                setError('Failed to find a compliant random fiction book. Please try again.');
+            }
+        } catch (err) {
+            setError('Failed to connect to book service.');
         } finally {
             setIsFetching(false);
         }
@@ -114,7 +172,21 @@ export default function Books() {
 
             {isFormOpen && (
                 <div className="form-container">
-                    <h2 className="section-title">{editingBook ? 'Edit Book' : 'Add New Book'}</h2>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                        <h2 className="section-title" style={{ marginBottom: 0 }}>{editingBook ? 'Edit Book' : 'Add New Book'}</h2>
+                        {!editingBook && (
+                            <button
+                                type="button"
+                                className="btn"
+                                onClick={handleRandomBook}
+                                disabled={isFetching}
+                                style={{ background: 'var(--primary-light)', color: 'var(--primary)', border: '1px solid var(--primary-light)', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
+                            >
+                                {isFetching ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                                Surprise Me
+                            </button>
+                        )}
+                    </div>
                     {error && (
                         <div className="form-error">
                             <AlertCircle size={18} />
