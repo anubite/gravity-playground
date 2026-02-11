@@ -15,11 +15,23 @@
 .logo {
     margin-bottom: 2rem;
     color: var(--primary);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.75rem;
+}
+
+.logo-img {
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
+    border-radius: 12px;
+}
+
+.logo h2 {
     font-size: 1.5rem;
     font-weight: 700;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
 }
 
 .nav-item {

@@ -14,7 +14,8 @@ export default function Layout() {
         <div className="app-layout">
             <aside className="sidebar">
                 <div className="logo">
-                    <h2>LibManager</h2>
+                    <img src="/logo.png" alt="Vibing Books Logo" className="logo-img" />
+                    <h2>Vibing Books</h2>
                 </div>
                 <nav>
                     {navItems.map(({ to, label, icon: Icon }) => (
