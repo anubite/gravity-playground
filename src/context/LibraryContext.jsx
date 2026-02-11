@@ -22,7 +22,9 @@ export function LibraryProvider({ children }) {
     const [books, setBooks] = useState([]);
     const [patrons, setPatrons] = useState([]);
     const [loans, setLoans] = useState([]);
-    const API_URL = 'http://localhost:3001/api';
+    const API_URL = window.location.origin.includes('localhost')
+        ? 'http://localhost:3001/api'
+        : '/api';
 
     // ISBN Validation Helper (Client-side)
     const isValidISBN = (isbn) => {
