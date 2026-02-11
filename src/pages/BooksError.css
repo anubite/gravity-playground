@@ -1,0 +1,12 @@
+.form-error {
+    color: var(--danger);
+    background-color: #fee2e2;
+    border: 1px solid #fecaca;
+    padding: 0.75rem;
+    border-radius: var(--radius);
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}

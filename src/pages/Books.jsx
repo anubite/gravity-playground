@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { useLibrary } from '../context/LibraryContext';
-import { Plus, Search, Edit2, Trash2, X, Check } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Check, AlertCircle } from 'lucide-react';
 import './Books.css';
+import './BooksError.css';
 
 export default function Books() {
     const { books, addBook, updateBook, deleteBook } = useLibrary();
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [editingBook, setEditingBook] = useState(null);
+    const [error, setError] = useState(null);
 
     const [formData, setFormData] = useState({
         title: '',
@@ -24,12 +26,18 @@ export default function Books() {
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        let result;
         if (editingBook) {
-            updateBook({ ...editingBook, ...formData, quantity: parseInt(formData.quantity) });
+            result = updateBook({ ...editingBook, ...formData, quantity: parseInt(formData.quantity) });
         } else {
-            addBook({ ...formData, quantity: parseInt(formData.quantity) });
+            result = addBook({ ...formData, quantity: parseInt(formData.quantity) });
         }
-        resetForm();
+
+        if (result.success) {
+            resetForm();
+        } else {
+            setError(result.error);
+        }
     };
 
     const handleEdit = (book) => {
@@ -52,6 +60,7 @@ export default function Books() {
     const resetForm = () => {
         setEditingBook(null);
         setFormData({ title: '', author: '', isbn: '', quantity: 1 });
+        setError(null);
         setIsFormOpen(false);
     };
 
@@ -71,6 +80,12 @@ export default function Books() {
             {isFormOpen && (
                 <div className="form-container">
                     <h2 className="section-title">{editingBook ? 'Edit Book' : 'Add New Book'}</h2>
+                    {error && (
+                        <div className="form-error">
+                            <AlertCircle size={18} />
+                            {error}
+                        </div>
+                    )}
                     <form onSubmit={handleSubmit}>
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                             <div className="form-group">

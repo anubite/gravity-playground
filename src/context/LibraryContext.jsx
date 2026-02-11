@@ -19,10 +19,19 @@ const initialLoans = [
 ];
 
 export function LibraryProvider({ children }) {
+    // ISBN Validation Helper
+    const isValidISBN = (isbn) => {
+        // Simple regex for ISBN-10 or ISBN-13 (ignoring strict checksum for this demo)
+        const regex = /^(?=(?:\D*\d){10}(?:(?:\D*\d){3})?$)[\d-]+$/;
+        return regex.test(isbn);
+    };
+
     // Initialize state from localStorage or use defaults
     const [books, setBooks] = useState(() => {
         const saved = localStorage.getItem('library_books');
-        return saved ? JSON.parse(saved) : initialBooks;
+        const parsed = saved ? JSON.parse(saved) : initialBooks;
+        // Sanitize: removes books with invalid ISBNs on load
+        return parsed.filter(book => isValidISBN(book.isbn));
     });
 
     const [patrons, setPatrons] = useState(() => {
@@ -41,12 +50,20 @@ export function LibraryProvider({ children }) {
     useEffect(() => localStorage.setItem('library_loans', JSON.stringify(loans)), [loans]);
 
     const addBook = (book) => {
+        if (!isValidISBN(book.isbn)) {
+            return { success: false, error: 'Invalid ISBN format. Must be 10 or 13 digits.' };
+        }
         const newBook = { ...book, id: Date.now(), available: book.quantity };
         setBooks([...books, newBook]);
+        return { success: true };
     };
 
     const updateBook = (updatedBook) => {
+        if (!isValidISBN(updatedBook.isbn)) {
+            return { success: false, error: 'Invalid ISBN format. Must be 10 or 13 digits.' };
+        }
         setBooks(books.map(b => b.id === updatedBook.id ? updatedBook : b));
+        return { success: true };
     };
 
     const deleteBook = (id) => {
