@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLibrary } from '../context/LibraryContext';
-import { Plus, Search, Edit2, Trash2, X, Check, AlertCircle } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Check, AlertCircle, Loader2, Wand2 } from 'lucide-react';
 import './Books.css';
 import './BooksError.css';
 
@@ -10,6 +10,7 @@ export default function Books() {
     const [searchTerm, setSearchTerm] = useState('');
     const [editingBook, setEditingBook] = useState(null);
     const [error, setError] = useState(null);
+    const [isFetching, setIsFetching] = useState(false);
 
     const [formData, setFormData] = useState({
         title: '',
@@ -23,6 +24,40 @@ export default function Books() {
         book.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
         book.isbn.includes(searchTerm)
     );
+
+    const handleFetchISBN = async () => {
+        if (!formData.title || !formData.author) {
+            setError('Please enter Title and Author first to fetch ISBN.');
+            return;
+        }
+
+        setIsFetching(true);
+        setError(null);
+        try {
+            const query = encodeURIComponent(`intitle:${formData.title}+inauthor:${formData.author}`);
+            const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${query}&maxResults=1`);
+            const data = await response.json();
+
+            if (data.items && data.items.length > 0) {
+                const bookInfo = data.items[0].volumeInfo;
+                const isbn13 = bookInfo.industryIdentifiers?.find(id => id.type === 'ISBN_13')?.identifier;
+                const isbn10 = bookInfo.industryIdentifiers?.find(id => id.type === 'ISBN_10')?.identifier;
+
+                const foundISBN = isbn13 || isbn10;
+                if (foundISBN) {
+                    setFormData(prev => ({ ...prev, isbn: foundISBN }));
+                } else {
+                    setError('Book found, but no ISBN information available.');
+                }
+            } else {
+                setError('No book found matching that title and author.');
+            }
+        } catch (err) {
+            setError('Failed to connect to book service. Please try manual entry.');
+        } finally {
+            setIsFetching(false);
+        }
+    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -110,13 +145,27 @@ export default function Books() {
                             </div>
                             <div className="form-group">
                                 <label className="form-label">ISBN</label>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    required
-                                    value={formData.isbn}
-                                    onChange={e => setFormData({ ...formData, isbn: e.target.value })}
-                                />
+                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        required
+                                        style={{ flex: 1 }}
+                                        value={formData.isbn}
+                                        onChange={e => setFormData({ ...formData, isbn: e.target.value })}
+                                        placeholder="10 or 13 digits"
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn"
+                                        style={{ background: 'var(--primary-light)', color: 'var(--primary)', border: '1px solid var(--primary-light)' }}
+                                        onClick={handleFetchISBN}
+                                        disabled={isFetching}
+                                        title="Auto-fetch ISBN"
+                                    >
+                                        {isFetching ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
+                                    </button>
+                                </div>
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Quantity</label>

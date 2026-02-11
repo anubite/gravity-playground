@@ -1,6 +1,7 @@
 :root {
   --primary: #2563eb;
   --primary-hover: #1d4ed8;
+  --primary-light: #dbeafe;
   --surface: #ffffff;
   --background: #f8fafc;
   --text: #0f172a;
@@ -37,7 +38,9 @@ a {
   color: inherit;
 }
 
-input, select, textarea {
+input,
+select,
+textarea {
   font-family: inherit;
 }
 
@@ -87,4 +90,18 @@ input, select, textarea {
   font-size: 1.875rem;
   font-weight: 700;
   color: var(--text);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
 }

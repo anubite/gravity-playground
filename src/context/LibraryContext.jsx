@@ -19,85 +19,135 @@ const initialLoans = [
 ];
 
 export function LibraryProvider({ children }) {
-    // ISBN Validation Helper
+    const [books, setBooks] = useState([]);
+    const [patrons, setPatrons] = useState([]);
+    const [loans, setLoans] = useState([]);
+    const API_URL = 'http://localhost:3001/api';
+
+    // ISBN Validation Helper (Client-side)
     const isValidISBN = (isbn) => {
-        // Simple regex for ISBN-10 or ISBN-13 (ignoring strict checksum for this demo)
         const regex = /^(?=(?:\D*\d){10}(?:(?:\D*\d){3})?$)[\d-]+$/;
         return regex.test(isbn);
     };
 
-    // Initialize state from localStorage or use defaults
-    const [books, setBooks] = useState(() => {
-        const saved = localStorage.getItem('library_books');
-        const parsed = saved ? JSON.parse(saved) : initialBooks;
-        // Sanitize: removes books with invalid ISBNs on load
-        return parsed.filter(book => isValidISBN(book.isbn));
-    });
+    const fetchData = async () => {
+        try {
+            const [booksRes, patronsRes, loansRes] = await Promise.all([
+                fetch(`${API_URL}/books`),
+                fetch(`${API_URL}/patrons`),
+                fetch(`${API_URL}/loans`)
+            ]);
 
-    const [patrons, setPatrons] = useState(() => {
-        const saved = localStorage.getItem('library_patrons');
-        return saved ? JSON.parse(saved) : initialPatrons;
-    });
+            const booksData = await booksRes.json();
+            const patronsData = await patronsRes.json();
+            const loansData = await loansRes.json();
 
-    const [loans, setLoans] = useState(() => {
-        const saved = localStorage.getItem('library_loans');
-        return saved ? JSON.parse(saved) : initialLoans;
-    });
+            setBooks(booksData);
+            setPatrons(patronsData);
+            setLoans(loansData);
+        } catch (error) {
+            console.error('Failed to fetch data:', error);
+        }
+    };
 
-    // Persist to localStorage
-    useEffect(() => localStorage.setItem('library_books', JSON.stringify(books)), [books]);
-    useEffect(() => localStorage.setItem('library_patrons', JSON.stringify(patrons)), [patrons]);
-    useEffect(() => localStorage.setItem('library_loans', JSON.stringify(loans)), [loans]);
+    useEffect(() => {
+        fetchData();
+    }, []);
 
-    const addBook = (book) => {
+    const addBook = async (book) => {
         if (!isValidISBN(book.isbn)) {
             return { success: false, error: 'Invalid ISBN format. Must be 10 or 13 digits.' };
         }
-        const newBook = { ...book, id: Date.now(), available: book.quantity };
-        setBooks([...books, newBook]);
-        return { success: true };
+        try {
+            const res = await fetch(`${API_URL}/books`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(book)
+            });
+            if (!res.ok) throw new Error('Failed to add book');
+            const newBook = await res.json();
+            setBooks(prev => [...prev, newBook]);
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
     };
 
-    const updateBook = (updatedBook) => {
+    const updateBook = async (updatedBook) => {
         if (!isValidISBN(updatedBook.isbn)) {
             return { success: false, error: 'Invalid ISBN format. Must be 10 or 13 digits.' };
         }
-        setBooks(books.map(b => b.id === updatedBook.id ? updatedBook : b));
-        return { success: true };
-    };
-
-    const deleteBook = (id) => {
-        setBooks(books.filter(b => b.id !== id));
-    };
-
-    const addPatron = (patron) => {
-        const newPatron = { ...patron, id: Date.now() };
-        setPatrons([...patrons, newPatron]);
-    };
-
-    const checkoutBook = (bookId, patronId) => {
-        const book = books.find(b => b.id === bookId);
-        if (book && book.available > 0) {
-            const loan = {
-                id: Date.now(),
-                bookId,
-                patronId,
-                loanDate: new Date().toISOString().split('T')[0],
-                dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 14 days
-                returned: false
-            };
-            setLoans([...loans, loan]);
-            setBooks(books.map(b => b.id === bookId ? { ...b, available: b.available - 1 } : b));
-            return true;
+        try {
+            const res = await fetch(`${API_URL}/books/${updatedBook.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedBook)
+            });
+            if (!res.ok) throw new Error('Failed to update book');
+            const data = await res.json();
+            setBooks(prev => prev.map(b => b.id === data.id ? data : b));
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: error.message };
         }
-        return false;
     };
 
-    const returnBook = (loanId) => {
-        const loan = loans.find(l => l.id === loanId);
-        if (loan && !loan.returned) {
-            setLoans(loans.map(l => l.id === loanId ? { ...l, returned: true } : l));
-            setBooks(books.map(b => b.id === loan.bookId ? { ...b, available: b.available + 1 } : b));
+    const deleteBook = async (id) => {
+        try {
+            const res = await fetch(`${API_URL}/books/${id}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const err = await res.json();
+                alert(err.error); // Simple alert for now
+                return;
+            }
+            setBooks(prev => prev.filter(b => b.id !== id));
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const addPatron = async (patron) => {
+        try {
+            const res = await fetch(`${API_URL}/patrons`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(patron)
+            });
+            const newPatron = await res.json();
+            setPatrons(prev => [...prev, newPatron]);
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const checkoutBook = async (bookId, patronId) => {
+        try {
+            const res = await fetch(`${API_URL}/loans`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ bookId, patronId })
+            });
+            if (!res.ok) return false;
+
+            // Re-fetch to sync all states (books available count, loans list)
+            fetchData();
+            return true;
+        } catch (error) {
+            console.error(error);
+            return false;
+        }
+    };
+
+    const returnBook = async (loanId) => {
+        try {
+            const res = await fetch(`${API_URL}/loans/${loanId}/return`, {
+                method: 'PUT'
+            });
+            if (res.ok) {
+                fetchData(); // Sync state
+            }
+        } catch (error) {
+            console.error(error);
         }
     };
 
