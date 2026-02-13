@@ -51,8 +51,8 @@ export default function Patrons() {
                 <div className="form-container">
                     <h2 className="section-title">Register New Patron</h2>
                     <form onSubmit={handleSubmit}>
-                        <div style={{ display: 'flex', gap: '2rem', alignItems: 'flex-start' }}>
-                            <div style={{ flex: 1, display: 'grid', gap: '1rem' }}>
+                        <div className="patron-form-main">
+                            <div className="patron-inputs">
                                 <div className="form-group">
                                     <label className="form-label">Full Name</label>
                                     <input
@@ -85,12 +85,12 @@ export default function Patrons() {
                                 </div>
                             </div>
 
-                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+                            <div className="avatar-preview-section">
                                 <label className="form-label">Avatar Preview</label>
-                                <div className="patron-avatar" style={{ width: '120px', height: '120px', marginBottom: 0 }}>
+                                <div className="patron-avatar large">
                                     <img src={generateAvatarUrl(avatarSeed)} alt="Avatar Preview" />
                                 </div>
-                                <button type="button" className="btn" onClick={regenerateAvatar} style={{ border: '1px solid var(--border)' }}>
+                                <button type="button" className="btn randomize-btn" onClick={regenerateAvatar}>
                                     <RefreshCw size={16} /> Randomize
                                 </button>
                             </div>

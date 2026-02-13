@@ -81,3 +81,13 @@
     font-size: 0.8rem;
     color: var(--text-secondary);
 }
+
+@media (max-width: 768px) {
+    .dashboard-stats {
+        gap: 1rem;
+    }
+
+    .recent-activity {
+        padding: 1rem;
+    }
+}

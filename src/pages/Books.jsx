@@ -207,15 +207,14 @@ export default function Books() {
 
             {isFormOpen && (
                 <div className="form-container">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                    <div className="form-header-row">
                         <h2 className="section-title" style={{ marginBottom: 0 }}>{editingBook ? 'Edit Book' : 'Add New Book'}</h2>
                         {!editingBook && (
                             <button
                                 type="button"
-                                className="btn"
+                                className="btn surprise-btn"
                                 onClick={handleRandomBook}
                                 disabled={isFetching}
-                                style={{ background: 'var(--primary-light)', color: 'var(--primary)', border: '1px solid var(--primary-light)', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
                             >
                                 {isFetching ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
                                 Surprise Me
@@ -229,7 +228,7 @@ export default function Books() {
                         </div>
                     )}
                     <form onSubmit={handleSubmit}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div className="form-grid">
                             <div className="form-group">
                                 <label className="form-label">Title</label>
                                 <input

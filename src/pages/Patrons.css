@@ -68,3 +68,51 @@
     height: 100%;
     object-fit: cover;
 }
+
+@media (max-width: 768px) {
+    .patrons-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.patron-form-main {
+    display: flex;
+    gap: 2rem;
+    align-items: flex-start;
+}
+
+.patron-inputs {
+    flex: 1;
+    display: grid;
+    gap: 1rem;
+}
+
+.avatar-preview-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.patron-avatar.large {
+    width: 120px;
+    height: 120px;
+    margin-bottom: 0;
+}
+
+.randomize-btn {
+    border: 1px solid var(--border);
+}
+
+@media (max-width: 768px) {
+    .patron-form-main {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .avatar-preview-section {
+        order: -1;
+        /* Show avatar on top on mobile */
+        margin-bottom: 2rem;
+    }
+}

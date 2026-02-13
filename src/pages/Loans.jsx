@@ -77,7 +77,7 @@ export default function Loans() {
                 <div className="form-container">
                     <h2 className="section-title">Checkout Book</h2>
                     <form onSubmit={handleSubmit}>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div className="form-grid">
                             <div className="form-group">
                                 <label className="form-label">Select Patron</label>
                                 <select
