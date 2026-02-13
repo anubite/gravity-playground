@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLibrary } from '../context/LibraryContext';
-import { Plus, Search, Edit2, Trash2, X, Check, AlertCircle, Loader2, Wand2, Sparkles } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, X, Check, AlertCircle, Loader2, Wand2, Sparkles, Book } from 'lucide-react';
 import './Books.css';
 import './BooksError.css';
 
@@ -16,7 +16,8 @@ export default function Books() {
         title: '',
         author: '',
         isbn: '',
-        quantity: 1
+        quantity: 1,
+        cover_url: ''
     });
 
     const filteredBooks = books.filter(book =>
@@ -24,6 +25,29 @@ export default function Books() {
         book.author.toLowerCase().includes(searchTerm.toLowerCase()) ||
         book.isbn.includes(searchTerm)
     );
+
+    const fetchCoverAndISBN = async (title, author) => {
+        try {
+            const query = encodeURIComponent(`intitle:${title}+inauthor:${author}`);
+            const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${query}&maxResults=1`);
+            const data = await response.json();
+
+            if (data.items && data.items.length > 0) {
+                const bookInfo = data.items[0].volumeInfo;
+                const isbn13 = bookInfo.industryIdentifiers?.find(id => id.type === 'ISBN_13')?.identifier;
+                const isbn10 = bookInfo.industryIdentifiers?.find(id => id.type === 'ISBN_10')?.identifier;
+                let cover_url = bookInfo.imageLinks?.thumbnail || bookInfo.imageLinks?.smallThumbnail;
+                if (cover_url) cover_url = cover_url.replace('http://', 'https://');
+
+
+                return { isbn: isbn13 || isbn10, cover_url: cover_url || '' };
+            }
+
+        } catch (err) {
+            console.error('[Fetch] Error fetching cover:', err);
+        }
+        return null;
+    };
 
     const handleFetchISBN = async () => {
         if (!formData.title || !formData.author) {
@@ -33,30 +57,19 @@ export default function Books() {
 
         setIsFetching(true);
         setError(null);
-        try {
-            const query = encodeURIComponent(`intitle:${formData.title}+inauthor:${formData.author}`);
-            const response = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${query}&maxResults=1`);
-            const data = await response.json();
 
-            if (data.items && data.items.length > 0) {
-                const bookInfo = data.items[0].volumeInfo;
-                const isbn13 = bookInfo.industryIdentifiers?.find(id => id.type === 'ISBN_13')?.identifier;
-                const isbn10 = bookInfo.industryIdentifiers?.find(id => id.type === 'ISBN_10')?.identifier;
-
-                const foundISBN = isbn13 || isbn10;
-                if (foundISBN) {
-                    setFormData(prev => ({ ...prev, isbn: foundISBN }));
-                } else {
-                    setError('Book found, but no ISBN information available.');
-                }
+        const result = await fetchCoverAndISBN(formData.title, formData.author);
+        if (result) {
+            if (result.isbn) {
+                setFormData(prev => ({ ...prev, isbn: result.isbn, cover_url: result.cover_url }));
             } else {
-                setError('No book found matching that title and author.');
+                setError('Book found, but no ISBN identifier available.');
+                setFormData(prev => ({ ...prev, cover_url: result.cover_url }));
             }
-        } catch (err) {
-            setError('Failed to connect to book service. Please try manual entry.');
-        } finally {
-            setIsFetching(false);
+        } else {
+            setError('No book found matching that title and author.');
         }
+        setIsFetching(false);
     };
 
     const handleRandomBook = async () => {
@@ -93,11 +106,15 @@ export default function Books() {
                         const foundISBN = isbn13 || isbn10;
 
                         if (hasOneAuthor && foundISBN) {
+                            let cover_url = bookInfo.imageLinks?.thumbnail || '';
+                            if (cover_url) cover_url = cover_url.replace('http://', 'https://');
+
                             setFormData({
                                 title: bookInfo.title || '',
                                 author: bookInfo.authors[0],
                                 isbn: foundISBN,
-                                quantity: 1
+                                quantity: 1,
+                                cover_url: cover_url
                             });
                             found = true;
                             break;
@@ -117,14 +134,31 @@ export default function Books() {
         }
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         let result;
-        if (editingBook) {
-            result = updateBook({ ...editingBook, ...formData, quantity: parseInt(formData.quantity) });
-        } else {
-            result = addBook({ ...formData, quantity: parseInt(formData.quantity) });
+        let bookToSave = { ...formData, quantity: parseInt(formData.quantity) };
+
+
+        // If ISBN exists but cover doesn't, try one last time to grab the cover
+        if (bookToSave.isbn && !bookToSave.cover_url) {
+
+            const fetchResult = await fetchCoverAndISBN(bookToSave.title, bookToSave.author);
+            if (fetchResult?.cover_url) {
+                bookToSave.cover_url = fetchResult.cover_url;
+
+            }
         }
+
+
+
+        if (editingBook) {
+            result = await updateBook({ ...editingBook, ...bookToSave });
+        } else {
+            result = await addBook(bookToSave);
+        }
+
+
 
         if (result.success) {
             resetForm();
@@ -139,7 +173,8 @@ export default function Books() {
             title: book.title,
             author: book.author,
             isbn: book.isbn,
-            quantity: book.quantity
+            quantity: book.quantity,
+            cover_url: book.cover_url || ''
         });
         setIsFormOpen(true);
     };
@@ -152,7 +187,7 @@ export default function Books() {
 
     const resetForm = () => {
         setEditingBook(null);
-        setFormData({ title: '', author: '', isbn: '', quantity: 1 });
+        setFormData({ title: '', author: '', isbn: '', quantity: 1, cover_url: '' });
         setError(null);
         setIsFormOpen(false);
     };
@@ -277,36 +312,49 @@ export default function Books() {
             </div>
 
             <div className="books-grid">
-                {filteredBooks.map(book => (
-                    <div key={book.id} className="book-card">
-                        <div>
-                            <h3 className="book-title">{book.title}</h3>
-                            <p className="book-author">by {book.author}</p>
+                {filteredBooks.map(book => {
+                    return (
+                        <div key={book.id} className="book-card">
+                            <div className="book-card-visual">
+                                {book.cover_url ? (
+                                    <img src={book.cover_url} alt={book.title} className="book-cover" />
+                                ) : (
+                                    <div className="book-cover-placeholder">
+                                        <Book size={40} />
+                                    </div>
+                                )}
+                            </div>
+                            <div className="book-card-info">
+                                <div>
+                                    <h3 className="book-title">{book.title}</h3>
+                                    <p className="book-author">by {book.author}</p>
+                                </div>
+                                <div className="book-meta">
+                                    <span>ISBN: {book.isbn}</span>
+                                    <span className={`book-badge ${book.available > 0 ? 'badge-success' : 'badge-danger'}`}>
+                                        {book.available} / {book.quantity} Available
+                                    </span>
+                                </div>
+                                <div className="book-actions">
+                                    <button
+                                        className="btn"
+                                        style={{ flex: 1, border: '1px solid var(--border)' }}
+                                        onClick={() => handleEdit(book)}
+                                    >
+                                        <Edit2 size={16} /> Edit
+                                    </button>
+                                    <button
+                                        className="btn"
+                                        style={{ border: '1px solid var(--border)', color: 'var(--danger)' }}
+                                        onClick={() => handleDelete(book.id)}
+                                    >
+                                        <Trash2 size={16} />
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                        <div className="book-meta">
-                            <span>ISBN: {book.isbn}</span>
-                            <span className={`book-badge ${book.available > 0 ? 'badge-success' : 'badge-danger'}`}>
-                                {book.available} / {book.quantity} Available
-                            </span>
-                        </div>
-                        <div className="book-actions">
-                            <button
-                                className="btn"
-                                style={{ flex: 1, border: '1px solid var(--border)' }}
-                                onClick={() => handleEdit(book)}
-                            >
-                                <Edit2 size={16} /> Edit
-                            </button>
-                            <button
-                                className="btn"
-                                style={{ border: '1px solid var(--border)', color: 'var(--danger)' }}
-                                onClick={() => handleDelete(book.id)}
-                            >
-                                <Trash2 size={16} />
-                            </button>
-                        </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
         </div>
     );

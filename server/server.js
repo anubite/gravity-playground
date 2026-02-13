@@ -8,7 +8,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
@@ -16,22 +16,23 @@ app.use(express.json());
 // Serve static files from the React app
 app.use(express.static(path.join(__dirname, '../dist')));
 
-// Initialize DB
-initializeDatabase();
-
 // --- Books API ---
 
 app.get('/api/books', async (req, res) => {
-    const db = await dbPromise;
-    const books = await db.all('SELECT * FROM books');
-    res.json(books);
+    try {
+        const db = await dbPromise;
+        const books = await db.all('SELECT * FROM books');
+        res.json(books);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.post('/api/books', async (req, res) => {
-    const { title, author, isbn, quantity } = req.body;
+    const { title, author, isbn, quantity, cover_url, coverUrl } = req.body;
+    const finalCoverUrl = cover_url || coverUrl;
     const db = await dbPromise;
 
-    // Basic Server-side ISBN validation
     const isbnRegex = /^(?=(?:\D*\d){10}(?:(?:\D*\d){3})?$)[\d-]+$/;
     if (!isbnRegex.test(isbn)) {
         return res.status(400).json({ error: 'Invalid ISBN format' });
@@ -39,18 +40,20 @@ app.post('/api/books', async (req, res) => {
 
     try {
         const result = await db.run(
-            'INSERT INTO books (title, author, isbn, quantity, available) VALUES (?, ?, ?, ?, ?)',
-            [title, author, isbn, quantity, quantity]
+            'INSERT INTO books (title, author, isbn, quantity, available, cover_url) VALUES (?, ?, ?, ?, ?, ?)',
+            [title, author, isbn, quantity, quantity, finalCoverUrl]
         );
         const newBook = await db.get('SELECT * FROM books WHERE id = ?', result.lastID);
         res.json(newBook);
     } catch (error) {
+        console.error('[Backend] Error adding book:', error);
         res.status(500).json({ error: error.message });
     }
 });
 
 app.put('/api/books/:id', async (req, res) => {
-    const { title, author, isbn, quantity } = req.body;
+    const { title, author, isbn, quantity, cover_url, coverUrl } = req.body;
+    const finalCoverUrl = cover_url || coverUrl;
     const { id } = req.params;
     const db = await dbPromise;
 
@@ -60,7 +63,6 @@ app.put('/api/books/:id', async (req, res) => {
     }
 
     try {
-        // Check current availability vs quantity change
         const currentBook = await db.get('SELECT * FROM books WHERE id = ?', id);
         if (!currentBook) return res.status(404).json({ error: 'Book not found' });
 
@@ -72,12 +74,13 @@ app.put('/api/books/:id', async (req, res) => {
         }
 
         await db.run(
-            'UPDATE books SET title = ?, author = ?, isbn = ?, quantity = ?, available = ? WHERE id = ?',
-            [title, author, isbn, quantity, newAvailable, id]
+            'UPDATE books SET title = ?, author = ?, isbn = ?, quantity = ?, available = ?, cover_url = ? WHERE id = ?',
+            [title, author, isbn, quantity, newAvailable, finalCoverUrl, id]
         );
         const updatedBook = await db.get('SELECT * FROM books WHERE id = ?', id);
         res.json(updatedBook);
     } catch (error) {
+        console.error('[Backend] Error updating book:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -85,7 +88,6 @@ app.put('/api/books/:id', async (req, res) => {
 app.delete('/api/books/:id', async (req, res) => {
     const db = await dbPromise;
     try {
-        // Check for active loans
         const loans = await db.get('SELECT count(*) as count FROM loans WHERE bookId = ? AND returned = 0', req.params.id);
         if (loans.count > 0) {
             return res.status(400).json({ error: 'Cannot delete book with active loans' });
@@ -101,9 +103,13 @@ app.delete('/api/books/:id', async (req, res) => {
 // --- Patrons API ---
 
 app.get('/api/patrons', async (req, res) => {
-    const db = await dbPromise;
-    const patrons = await db.all('SELECT * FROM patrons');
-    res.json(patrons);
+    try {
+        const db = await dbPromise;
+        const patrons = await db.all('SELECT * FROM patrons');
+        res.json(patrons);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.post('/api/patrons', async (req, res) => {
@@ -124,9 +130,13 @@ app.post('/api/patrons', async (req, res) => {
 // --- Loans API ---
 
 app.get('/api/loans', async (req, res) => {
-    const db = await dbPromise;
-    const loans = await db.all('SELECT * FROM loans');
-    res.json(loans);
+    try {
+        const db = await dbPromise;
+        const loans = await db.all('SELECT * FROM loans');
+        res.json(loans);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
 });
 
 app.post('/api/loans', async (req, res) => {
@@ -148,9 +158,7 @@ app.post('/api/loans', async (req, res) => {
         );
 
         await db.run('UPDATE books SET available = available - 1 WHERE id = ?', bookId);
-
-        // Fetch result
-        const result = await db.get('SELECT * FROM loans WHERE rowid = last_insert_rowid()');
+        const result = await db.get('SELECT * FROM loans WHERE id = last_insert_rowid()');
         res.json(result);
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -176,12 +184,28 @@ app.put('/api/loans/:id/return', async (req, res) => {
     }
 });
 
-// The "catchall" handler: for any request that doesn't
-// match one above, send back React's index.html file.
+// The "catchall" handler
 app.get('*any', (req, res) => {
     res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on port ${PORT}`);
-});
+const startServer = async () => {
+    try {
+        console.log('[Backend] Initializing database...');
+        await initializeDatabase();
+
+        app.listen(PORT, '0.0.0.0', () => {
+            console.log('\n==========================================');
+            console.log(`🚀 Vibing Books running on port ${PORT}`);
+            console.log('🔗 URL: http://localhost:3001');
+            console.log('📅 Time:', new Date().toLocaleString());
+            console.log('==========================================\n');
+            console.log('[Backend] Waiting for requests...\n');
+        });
+    } catch (error) {
+        console.error('[Backend] FAILED TO START:', error);
+        process.exit(1);
+    }
+};
+
+startServer();

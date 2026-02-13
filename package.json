@@ -8,6 +8,7 @@
     "start": "node server/server.js",
     "build": "vite build",
     "postinstall": "npm run build",
+    "migrate:covers": "node server/scripts/migrate_covers.js",
     "lint": "eslint .",
     "preview": "vite preview"
   },
